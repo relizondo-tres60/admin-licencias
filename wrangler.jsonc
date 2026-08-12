@@ -25,9 +25,13 @@
   "vars": {
     "ENTORNO": "prod",
     "ADMIN_EMAIL": "rodrigo.a.elizondo@gmail.com",
-    // Completar con los datos de la aplicación en Cloudflare Access (Zero Trust):
-    "ACCESS_TEAM_DOMAIN": "",
-    "ACCESS_AUD": ""
+    // Cloudflare Access (Zero Trust). Reemplazar los marcadores por los valores reales:
+    //  - ACCESS_TEAM_DOMAIN: dominio del equipo (sin https://), p. ej. "miequipo.cloudflareaccess.com"
+    //  - ACCESS_AUD: Application Audience (AUD) Tag de la app self-hosted creada sobre
+    //                el hostname https://admin-licencias.relizondo-0d3.workers.dev
+    // Mientras queden los marcadores (o vacíos), la API responde 401 en prod (seguro por defecto).
+    "ACCESS_TEAM_DOMAIN": "PEGAR_TEAM_DOMAIN.cloudflareaccess.com",
+    "ACCESS_AUD": "PEGAR_AUD_TAG"
   },
 
   "observability": {

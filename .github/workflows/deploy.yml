@@ -1,0 +1,66 @@
+name: CI y despliegue
+
+# Valida (typecheck + build) en cada push y PR, y despliega a Cloudflare en
+# push a main: resuelve el database_id de D1, aplica migraciones remotas y
+# publica el Worker.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  ci:
+    name: Typecheck y build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Build del frontend
+        run: npm run build
+
+  desplegar:
+    name: Migrar y desplegar
+    runs-on: ubuntu-latest
+    needs: ci
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      DB_NAME: admin-licencias
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+
+      - name: Build del frontend
+        run: npm run build
+
+      - name: Resolver database_id de D1 (crear si no existe) y escribirlo
+        run: |
+          set -e
+          DB_ID="$(npx wrangler d1 list --json | jq -r --arg n "$DB_NAME" '.[] | select(.name==$n) | .uuid // .database_id' | head -1)"
+          if [ -z "$DB_ID" ] || [ "$DB_ID" = "null" ]; then
+            echo "Creando base D1 $DB_NAME…"
+            npx wrangler d1 create "$DB_NAME"
+            DB_ID="$(npx wrangler d1 list --json | jq -r --arg n "$DB_NAME" '.[] | select(.name==$n) | .uuid // .database_id' | head -1)"
+          fi
+          echo "database_id=$DB_ID"
+          sed -i "s/REEMPLAZAR_TRAS_CREAR_D1/$DB_ID/g" wrangler.jsonc
+
+      - name: Aplicar migraciones remotas
+        run: npx wrangler d1 migrations apply "$DB_NAME" --remote
+
+      - name: Desplegar Worker
+        run: npx wrangler deploy

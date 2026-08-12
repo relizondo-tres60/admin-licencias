@@ -1,0 +1,60 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "admin-licencias",
+  "main": "src/index.ts",
+  "compatibility_date": "2025-01-15",
+
+  // Frontend estático (Cloudflare Assets). El Worker resuelve el fallback SPA.
+  "assets": {
+    "directory": "./dist/client",
+    "binding": "ASSETS"
+  },
+
+  // Base de datos D1.
+  // Reemplazar database_id con el valor real tras crearla:
+  //   wrangler d1 create admin-licencias
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "admin-licencias",
+      "database_id": "REEMPLAZAR_TRAS_CREAR_D1",
+      "migrations_dir": "migrations"
+    }
+  ],
+
+  "vars": {
+    "ENTORNO": "prod",
+    "ADMIN_EMAIL": "rodrigo.a.elizondo@gmail.com",
+    // Completar con los datos de la aplicación en Cloudflare Access (Zero Trust):
+    "ACCESS_TEAM_DOMAIN": "",
+    "ACCESS_AUD": ""
+  },
+
+  "observability": {
+    "enabled": true
+  },
+
+  // ── Entorno de desarrollo local (wrangler dev) ──────────────────────────────
+  "env": {
+    "dev": {
+      "vars": {
+        "ENTORNO": "dev",
+        "ADMIN_EMAIL": "rodrigo.a.elizondo@gmail.com",
+        "ACCESS_TEAM_DOMAIN": "",
+        "ACCESS_AUD": ""
+      },
+      "d1_databases": [
+        {
+          "binding": "DB",
+          "database_name": "admin-licencias",
+          "database_id": "REEMPLAZAR_TRAS_CREAR_D1",
+          "migrations_dir": "migrations"
+        }
+      ],
+      "assets": {
+        "directory": "./dist/client",
+        "binding": "ASSETS"
+      }
+    }
+  }
+}

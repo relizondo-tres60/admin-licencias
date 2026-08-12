@@ -1,0 +1,12 @@
+# Copiar a .dev.vars (ignorado por git) para desarrollo local.
+# En producción estas variables se configuran en Cloudflare (vars y/o secrets).
+
+# Entorno local: 'dev' habilita el bypass de Access (X-Dev-Email / ADMIN_EMAIL).
+ENTORNO="dev"
+
+# Correo del administrador semilla: se promueve a rol 'admin' en su primer acceso.
+ADMIN_EMAIL="rodrigo.a.elizondo@gmail.com"
+
+# Cloudflare Access (Zero Trust). En local se puede dejar vacío y usar el bypass dev.
+ACCESS_TEAM_DOMAIN=""
+ACCESS_AUD=""

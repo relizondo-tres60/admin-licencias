@@ -17,16 +17,21 @@ export function Modal({
   ancho?: string
 }) {
   const ref = useRef<HTMLDivElement>(null)
+  // Guardamos onCerrar en un ref para no re-ejecutar el efecto en cada render
+  // (si dependiera de onCerrar, cada tecleo reenfoca el diálogo y el input pierde
+  // el foco). El foco inicial solo debe correr al abrir.
+  const onCerrarRef = useRef(onCerrar)
+  onCerrarRef.current = onCerrar
 
   useEffect(() => {
     if (!abierto) return
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onCerrar()
+      if (e.key === 'Escape') onCerrarRef.current()
     }
     document.addEventListener('keydown', onKey)
     ref.current?.focus()
     return () => document.removeEventListener('keydown', onKey)
-  }, [abierto, onCerrar])
+  }, [abierto])
 
   if (!abierto) return null
 

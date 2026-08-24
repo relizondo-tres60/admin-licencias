@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useParams, Link } from 'react-router-dom'
+import { useParams, useSearchParams, Link } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { apiGet, apiEnviar } from '../lib/api'
 import { useSesion, puede } from '../lib/sesion'
@@ -31,7 +31,13 @@ export default function DetalleLicencia() {
   const qc = useQueryClient()
   const { data: sesion } = useSesion()
   const permisos = puede(sesion?.usuario)
-  const [pestana, setPestana] = useState<Pestana>('ficha')
+  const [searchParams] = useSearchParams()
+  const tabInicial = searchParams.get('tab') as Pestana | null
+  const [pestana, setPestana] = useState<Pestana>(
+    tabInicial && ['ficha', 'aprobadores', 'asignaciones', 'historico'].includes(tabInicial)
+      ? tabInicial
+      : 'ficha',
+  )
   const [confirmarBaja, setConfirmarBaja] = useState(false)
 
   const { data, isLoading, error } = useQuery({

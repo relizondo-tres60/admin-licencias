@@ -107,13 +107,19 @@ export function normalizarLicencia(v: LicenciaInput) {
   }
 }
 
-// ── Asignaciones (usado en F4) ──────────────────────────────────────────────
+// ── Asignaciones ────────────────────────────────────────────────────────────
 export const asignacionSchema = z.object({
   licencia_id: z.number().int().positive(),
   usuario_maestro_id: z.number().int().positive(),
   key_asignada: textoOpcional,
-  aprobador: textoOpcional,
-  ticket_referencia: textoOpcional,
+  aprobador: z
+    .string({ required_error: 'Debe seleccionar un aprobador' })
+    .trim()
+    .min(1, 'Debe seleccionar un aprobador'),
+  ticket_referencia: z
+    .string({ required_error: 'El ticket de referencia es obligatorio' })
+    .trim()
+    .min(1, 'El ticket de referencia es obligatorio'),
   observacion_asignacion: textoOpcional,
 })
 

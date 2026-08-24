@@ -88,6 +88,22 @@ asignaciones.post('/', requireRol('admin', 'operador'), async (c) => {
     return c.json({ error: 'No tiene permisos para asignar esta licencia.' }, 403)
   }
 
+  // El aprobador debe ser uno de los aprobadores registrados en la licencia.
+  const aprobadores = await consultar<{ nombre: string }>(
+    c.env,
+    `SELECT nombre FROM licencia_aprobadores WHERE licencia_id = ?`,
+    d.licencia_id,
+  )
+  if (aprobadores.length === 0) {
+    return c.json(
+      { error: 'La licencia no tiene aprobadores. Agregue al menos uno antes de asignar.' },
+      409,
+    )
+  }
+  if (!aprobadores.some((a) => a.nombre === d.aprobador)) {
+    return c.json({ error: 'El aprobador debe ser uno de los aprobadores de la licencia.' }, 400)
+  }
+
   // Regla 7: usuario del maestro debe existir y estar activo.
   const usuario = await primera<{ id: number; nombre: string; activo: number }>(
     c.env,

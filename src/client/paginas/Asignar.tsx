@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { useSearchParams, Link } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { apiGet, apiEnviar } from '../lib/api'
+import { useSesion, puede } from '../lib/sesion'
 import { useToast } from '../componentes/Toast'
 import { Cargando, ErrorMsg, Vacio } from '../componentes/Estado'
 import { Boton, Tarjeta, Titulo } from '../componentes/ui'
@@ -16,6 +17,8 @@ export default function Asignar() {
   const toast = useToast()
   const qc = useQueryClient()
   const [searchParams] = useSearchParams()
+  const { data: sesion } = useSesion()
+  const permisos = puede(sesion?.usuario)
 
   const [licenciaId, setLicenciaId] = useState<number | null>(null)
   const [usuarioId, setUsuarioId] = useState<number | null>(null)
@@ -78,7 +81,11 @@ export default function Asignar() {
   })
 
   const puedeAsignar =
-    licenciaId != null && usuarioId != null && (!requiereKey || keyAsignada.trim() !== '')
+    licenciaId != null &&
+    usuarioId != null &&
+    aprobador.trim() !== '' &&
+    ticket.trim() !== '' &&
+    (!requiereKey || keyAsignada.trim() !== '')
 
   return (
     <div className="mx-auto max-w-2xl">
@@ -144,15 +151,19 @@ export default function Asignar() {
               )}
 
               <div className="grid grid-cols-2 gap-4">
-                <label className="block">
-                  <span className="mb-1 block text-xs font-medium text-slate-600">Aprobador</span>
-                  {aprobadores.length > 0 ? (
+                <div className="block">
+                  <span className="mb-1 block text-xs font-medium text-slate-600">Aprobador *</span>
+                  <div className="flex items-center gap-2">
                     <select
                       className={claseInput}
                       value={aprobador}
                       onChange={(e) => setAprobador(e.target.value)}
+                      required
+                      disabled={licenciaId == null || aprobadores.length === 0}
                     >
-                      <option value="">Sin aprobador</option>
+                      <option value="" disabled>
+                        {aprobadores.length === 0 ? 'Sin aprobadores' : 'Seleccione…'}
+                      </option>
                       {aprobadores.map((a) => (
                         <option key={a.id} value={a.nombre}>
                           {a.nombre}
@@ -160,23 +171,34 @@ export default function Asignar() {
                         </option>
                       ))}
                     </select>
-                  ) : (
-                    <input
-                      className={claseInput}
-                      value={aprobador}
-                      onChange={(e) => setAprobador(e.target.value)}
-                      placeholder="La licencia no tiene aprobadores registrados"
-                    />
+                    {permisos.gestionarAprobadores && licenciaId != null && (
+                      <Link
+                        to={`/licencias/${licenciaId}?tab=aprobadores`}
+                        title="Agregar aprobadores a esta licencia"
+                        className="flex h-9 w-9 shrink-0 items-center justify-center rounded border border-slate-300 text-lg text-marca-600 hover:bg-marca-50"
+                      >
+                        +
+                      </Link>
+                    )}
+                  </div>
+                  {licenciaId != null && aprobadores.length === 0 && (
+                    <span className="mt-1 block text-xs text-amber-600">
+                      Esta licencia no tiene aprobadores.{' '}
+                      {permisos.gestionarAprobadores
+                        ? 'Agrega uno con el botón +.'
+                        : 'Solicita a un administrador que agregue uno.'}
+                    </span>
                   )}
-                </label>
+                </div>
                 <label className="block">
                   <span className="mb-1 block text-xs font-medium text-slate-600">
-                    Ticket de referencia
+                    Ticket de referencia *
                   </span>
                   <input
                     className={claseInput}
                     value={ticket}
                     onChange={(e) => setTicket(e.target.value)}
+                    required
                   />
                 </label>
               </div>

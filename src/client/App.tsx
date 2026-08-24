@@ -7,6 +7,7 @@ import Maestro from './paginas/Maestro'
 import Licencias from './paginas/Licencias'
 import DetalleLicencia from './paginas/DetalleLicencia'
 import Asignar from './paginas/Asignar'
+import Asignaciones from './paginas/Asignaciones'
 import Dashboard from './paginas/Dashboard'
 import Historico from './paginas/Historico'
 import Reportes from './paginas/Reportes'
@@ -26,6 +27,7 @@ export default function App() {
         <Route path="licencias" element={<Licencias />} />
         <Route path="licencias/:id" element={<DetalleLicencia />} />
         <Route path="asignar" element={<Asignar />} />
+        <Route path="asignaciones" element={<Asignaciones />} />
         <Route path="historial" element={<Historico />} />
         <Route path="reportes" element={<Reportes />} />
         <Route path="maestro" element={<Maestro />} />

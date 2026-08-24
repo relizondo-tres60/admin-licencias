@@ -54,3 +54,13 @@ autenticacion.get('/callback', async (c) => {
 })
 
 autenticacion.get('/logout', () => redirect('/', [cookieSesion('', true)]))
+
+// Diagnóstico: reporta qué variables/secrets ve el Worker (solo booleanos).
+autenticacion.get('/estado', (c) =>
+  c.json({
+    entorno: c.env.ENTORNO,
+    google_client_id: !!c.env.GOOGLE_CLIENT_ID,
+    google_client_secret: !!c.env.GOOGLE_CLIENT_SECRET,
+    jwt_secret: !!c.env.JWT_SECRET,
+  }),
+)

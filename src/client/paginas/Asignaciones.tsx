@@ -69,6 +69,17 @@ export default function Asignaciones() {
     )
   }, [data, q])
 
+  // Agrupación por sistema licenciado (aplicación), vista por defecto.
+  const grupos = useMemo(() => {
+    const m = new Map<string, { app: string; licenciaId: number; items: Asignacion[] }>()
+    for (const a of filas) {
+      const g = m.get(a.nombre_aplicacion)
+      if (g) g.items.push(a)
+      else m.set(a.nombre_aplicacion, { app: a.nombre_aplicacion, licenciaId: a.licencia_id, items: [a] })
+    }
+    return [...m.values()].sort((x, y) => x.app.localeCompare(y.app, 'es'))
+  }, [filas])
+
   return (
     <div>
       <Titulo sub="Todas las asignaciones vigentes del sistema. Libera desde aquí sin entrar a cada licencia.">
@@ -94,61 +105,69 @@ export default function Asignaciones() {
         ) : filas.length === 0 ? (
           <Vacio texto="No hay asignaciones vigentes." />
         ) : (
-          <div className="overflow-x-auto">
-            <table className="min-w-full text-sm">
-              <thead>
-                <tr className="border-b text-left text-xs uppercase tracking-wide text-slate-500">
-                  <th className="py-2 pr-4">Aplicación</th>
-                  <th className="py-2 pr-4">Usuario</th>
-                  <th className="py-2 pr-4">Área</th>
-                  <th className="py-2 pr-4">Key</th>
-                  <th className="py-2 pr-4">Aprobador</th>
-                  <th className="py-2 pr-4">Ticket</th>
-                  <th className="py-2 pr-4">Asignada</th>
-                  {permisos.asignar && <th className="py-2 pr-4"></th>}
-                </tr>
-              </thead>
-              <tbody>
-                {filas.map((a) => (
-                  <tr key={a.id} className="border-b border-slate-100 hover:bg-slate-50">
-                    <td className="py-2 pr-4">
-                      <Link
-                        to={`/licencias/${a.licencia_id}`}
-                        className="font-medium text-marca-700 hover:underline"
-                      >
-                        {a.nombre_aplicacion}
-                      </Link>
-                    </td>
-                    <td className="py-2 pr-4">
-                      <div className="font-medium text-slate-700">{a.usuario_nombre}</div>
-                      <div className="text-xs text-slate-400">{a.usuario_email ?? '—'}</div>
-                    </td>
-                    <td className="py-2 pr-4 text-slate-600">{a.usuario_area ?? '—'}</td>
-                    <td className="py-2 pr-4 font-mono text-xs text-slate-600">
-                      {a.key_asignada ?? '—'}
-                    </td>
-                    <td className="py-2 pr-4 text-slate-600">{a.aprobador ?? '—'}</td>
-                    <td className="py-2 pr-4 text-slate-600">{a.ticket_referencia ?? '—'}</td>
-                    <td className="py-2 pr-4 text-xs text-slate-500">
-                      {fechaHora(a.fecha_asignacion)}
-                    </td>
-                    {permisos.asignar && (
-                      <td className="py-2 pr-4 text-right">
-                        <button
-                          onClick={() => {
-                            setALiberar(a)
-                            setMotivo('')
-                          }}
-                          className="rounded border border-red-200 px-2 py-1 text-xs font-medium text-red-600 hover:bg-red-50"
-                        >
-                          Liberar
-                        </button>
-                      </td>
-                    )}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <div className="space-y-6">
+            {grupos.map((g) => (
+              <div key={g.app} className="overflow-hidden rounded-lg border border-slate-200">
+                <div className="flex items-center justify-between bg-slate-50 px-4 py-2">
+                  <Link
+                    to={`/licencias/${g.licenciaId}`}
+                    className="font-semibold text-marca-700 hover:underline"
+                  >
+                    {g.app}
+                  </Link>
+                  <span className="text-xs text-slate-500">
+                    {g.items.length} asignación(es)
+                  </span>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="min-w-full text-sm">
+                    <thead>
+                      <tr className="border-b text-left text-xs uppercase tracking-wide text-slate-500">
+                        <th className="px-4 py-2">Usuario</th>
+                        <th className="px-4 py-2">Área</th>
+                        <th className="px-4 py-2">Key</th>
+                        <th className="px-4 py-2">Aprobador</th>
+                        <th className="px-4 py-2">Ticket</th>
+                        <th className="px-4 py-2">Asignada</th>
+                        {permisos.asignar && <th className="px-4 py-2"></th>}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {g.items.map((a) => (
+                        <tr key={a.id} className="border-b border-slate-100 hover:bg-slate-50">
+                          <td className="px-4 py-2">
+                            <div className="font-medium text-slate-700">{a.usuario_nombre}</div>
+                            <div className="text-xs text-slate-400">{a.usuario_email ?? '—'}</div>
+                          </td>
+                          <td className="px-4 py-2 text-slate-600">{a.usuario_area ?? '—'}</td>
+                          <td className="px-4 py-2 font-mono text-xs text-slate-600">
+                            {a.key_asignada ?? '—'}
+                          </td>
+                          <td className="px-4 py-2 text-slate-600">{a.aprobador ?? '—'}</td>
+                          <td className="px-4 py-2 text-slate-600">{a.ticket_referencia ?? '—'}</td>
+                          <td className="px-4 py-2 text-xs text-slate-500">
+                            {fechaHora(a.fecha_asignacion)}
+                          </td>
+                          {permisos.asignar && (
+                            <td className="px-4 py-2 text-right">
+                              <button
+                                onClick={() => {
+                                  setALiberar(a)
+                                  setMotivo('')
+                                }}
+                                className="rounded border border-red-200 px-2 py-1 text-xs font-medium text-red-600 hover:bg-red-50"
+                              >
+                                Liberar
+                              </button>
+                            </td>
+                          )}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            ))}
           </div>
         )}
       </Tarjeta>

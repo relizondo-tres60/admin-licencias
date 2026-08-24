@@ -25,6 +25,16 @@ export interface Licencia {
   actualizado_en: string | null
   asignadas: number
   disponibles: number
+  // Nombres de los aprobadores (concatenados) de la licencia.
+  aprobadores: string | null
+}
+
+export interface Aprobador {
+  id: number
+  licencia_id: number
+  nombre: string
+  email: string | null
+  creado_en: string
 }
 
 export const ETIQUETA_TIPO: Record<TipoLicencia, string> = {

@@ -6,7 +6,7 @@ import { useToast } from '../componentes/Toast'
 import { Cargando, ErrorMsg, Vacio } from '../componentes/Estado'
 import { Boton, Tarjeta, Titulo } from '../componentes/ui'
 import { ComboUsuario } from '../componentes/ComboUsuario'
-import type { Licencia } from '../lib/tipos'
+import type { Licencia, Aprobador } from '../lib/tipos'
 import { ETIQUETA_TIPO } from '../lib/tipos'
 
 const claseInput =
@@ -31,6 +31,14 @@ export default function Asignar() {
   })
   const licencias = data?.licencias ?? []
   const licencia = licencias.find((l) => l.id === licenciaId)
+
+  // Aprobadores de la licencia seleccionada (para el selector de aprobador).
+  const { data: aprobData } = useQuery({
+    queryKey: ['aprobadores', licenciaId],
+    queryFn: () => apiGet<{ aprobadores: Aprobador[] }>(`/licencias/${licenciaId}/aprobadores`),
+    enabled: licenciaId != null,
+  })
+  const aprobadores = aprobData?.aprobadores ?? []
 
   // Preselección por query param (?licencia=id) desde el detalle.
   useEffect(() => {
@@ -138,12 +146,28 @@ export default function Asignar() {
               <div className="grid grid-cols-2 gap-4">
                 <label className="block">
                   <span className="mb-1 block text-xs font-medium text-slate-600">Aprobador</span>
-                  <input
-                    className={claseInput}
-                    value={aprobador}
-                    onChange={(e) => setAprobador(e.target.value)}
-                    placeholder={licencia?.aprobador_nombre ?? ''}
-                  />
+                  {aprobadores.length > 0 ? (
+                    <select
+                      className={claseInput}
+                      value={aprobador}
+                      onChange={(e) => setAprobador(e.target.value)}
+                    >
+                      <option value="">Sin aprobador</option>
+                      {aprobadores.map((a) => (
+                        <option key={a.id} value={a.nombre}>
+                          {a.nombre}
+                          {a.email ? ` (${a.email})` : ''}
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    <input
+                      className={claseInput}
+                      value={aprobador}
+                      onChange={(e) => setAprobador(e.target.value)}
+                      placeholder="La licencia no tiene aprobadores registrados"
+                    />
+                  )}
                 </label>
                 <label className="block">
                   <span className="mb-1 block text-xs font-medium text-slate-600">

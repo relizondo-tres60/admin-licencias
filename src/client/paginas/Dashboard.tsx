@@ -38,7 +38,7 @@ interface DashboardData {
       id: number
       nombre_aplicacion: string
       key_user_nombre: string | null
-      aprobador_nombre: string | null
+      sin_aprobador: number
     }[]
   }
   movimientos: {
@@ -236,7 +236,7 @@ export default function Dashboard() {
                   </Link>
                   <span className="flex gap-1">
                     {!a.key_user_nombre && <Insignia tono="ambar">key user</Insignia>}
-                    {!a.aprobador_nombre && <Insignia tono="ambar">aprobador</Insignia>}
+                    {!!a.sin_aprobador && <Insignia tono="ambar">aprobador</Insignia>}
                   </span>
                 </li>
               ))}

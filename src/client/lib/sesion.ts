@@ -10,6 +10,7 @@ export interface Usuario {
   email: string
   nombre: string
   rol: Rol
+  alcance: 'todas' | 'seleccion'
 }
 
 export function useSesion() {
@@ -20,12 +21,19 @@ export function useSesion() {
   })
 }
 
-/** Permisos derivados del rol (el backend valida igual en cada endpoint). */
-export function puede(rol: Rol | undefined) {
+/** Permisos derivados del rol y del alcance (el backend valida igual en cada
+ *  endpoint). Un usuario restringido (alcance = 'seleccion') solo puede asignar
+ *  y liberar sus licencias autorizadas: no crea/edita licencias ni aprobadores. */
+export function puede(usuario: Usuario | undefined) {
+  const rol = usuario?.rol
+  const restringido = usuario?.alcance === 'seleccion'
+  const gestion = rol === 'admin' || rol === 'operador'
   return {
-    editarLicencias: rol === 'admin' || rol === 'operador',
-    asignar: rol === 'admin' || rol === 'operador',
-    sincronizar: rol === 'admin' || rol === 'operador',
+    restringido,
+    editarLicencias: gestion && !restringido,
+    gestionarAprobadores: gestion && !restringido,
+    asignar: gestion,
+    sincronizar: gestion,
     darDeBaja: rol === 'admin',
     administrarUsuarios: rol === 'admin',
   }

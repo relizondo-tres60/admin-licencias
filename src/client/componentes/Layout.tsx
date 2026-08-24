@@ -20,7 +20,7 @@ const NAV: ItemNav[] = [
 export default function Layout() {
   const { data } = useSesion()
   const usuario = data?.usuario
-  const permisos = puede(usuario?.rol)
+  const permisos = puede(usuario)
 
   return (
     <div className="flex min-h-screen">

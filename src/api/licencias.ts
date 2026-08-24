@@ -8,13 +8,16 @@ import type { Env, Variables, Actor } from '../tipos'
 import { requireRol } from '../lib/auth-middleware'
 import { ahora, consultar, primera } from '../lib/db'
 import { stmtHistorial } from '../lib/historial'
-import { licenciaSchema, normalizarLicencia } from '../lib/validaciones'
+import { licenciaSchema, normalizarLicencia, aprobadorSchema } from '../lib/validaciones'
+import { permisoLicencias, puedeVer } from '../lib/alcance'
 
 export const licencias = new Hono<{ Bindings: Env; Variables: Variables }>()
 
 const SELECT_BASE = `
   SELECT l.*, COALESCE(a.vig, 0) AS asignadas,
-         (l.cantidad_total - COALESCE(a.vig, 0)) AS disponibles
+         (l.cantidad_total - COALESCE(a.vig, 0)) AS disponibles,
+         (SELECT group_concat(nombre, ', ') FROM licencia_aprobadores ap
+            WHERE ap.licencia_id = l.id) AS aprobadores
   FROM licencias l
   LEFT JOIN (
     SELECT licencia_id, COUNT(*) AS vig
@@ -54,6 +57,16 @@ licencias.get('/', async (c) => {
     params.push(like, like)
   }
 
+  // Alcance: usuarios restringidos solo ven sus licencias autorizadas.
+  const permiso = await permisoLicencias(c.env, c.get('actor') as Actor)
+  if (permiso.restringido) {
+    if (permiso.ids.size === 0) cond.push('1 = 0')
+    else {
+      cond.push(`l.id IN (${Array.from(permiso.ids).map(() => '?').join(',')})`)
+      params.push(...permiso.ids)
+    }
+  }
+
   // Filtro por disponibilidad se aplica sobre la columna calculada.
   const having =
     disponibilidad === 'con'
@@ -85,6 +98,8 @@ licencias.get('/', async (c) => {
 licencias.get('/:id', async (c) => {
   const id = Number(c.req.param('id'))
   if (!Number.isInteger(id)) return c.json({ error: 'Identificador inválido' }, 400)
+  const permiso = await permisoLicencias(c.env, c.get('actor') as Actor)
+  if (!puedeVer(permiso, id)) return c.json({ error: 'Licencia no encontrada' }, 404)
   const lic = await primera(c.env, `SELECT * FROM (${SELECT_BASE}) WHERE id = ?`, id)
   if (!lic) return c.json({ error: 'Licencia no encontrada' }, 404)
   return c.json({ licencia: lic })
@@ -97,6 +112,13 @@ licencias.post('/', requireRol('admin', 'operador'), async (c) => {
   if (!parsed.success) return c.json({ error: errorZod(parsed.error) }, 400)
   const d = normalizarLicencia(parsed.data)
   const actor = c.get('actor') as Actor
+
+  // Alcance: usuarios restringidos no pueden crear licencias.
+  const permiso = await permisoLicencias(c.env, actor)
+  if (permiso.restringido) {
+    return c.json({ error: 'No tiene permisos para crear licencias' }, 403)
+  }
+
   const ts = ahora()
 
   const insertLic = c.env.DB.prepare(
@@ -144,6 +166,12 @@ licencias.put('/:id', requireRol('admin', 'operador'), async (c) => {
     id,
   )
   if (!antes) return c.json({ error: 'Licencia no encontrada' }, 404)
+
+  // Alcance: usuarios restringidos no pueden editar licencias.
+  const permisoEd = await permisoLicencias(c.env, c.get('actor') as Actor)
+  if (permisoEd.restringido) {
+    return c.json({ error: 'No tiene permisos para editar licencias' }, 403)
+  }
 
   const body = await c.req.json().catch(() => null)
   const parsed = licenciaSchema.safeParse(body)
@@ -231,5 +259,138 @@ licencias.delete('/:id', requireRol('admin'), async (c) => {
     ip: c.get('ip'),
   })
   await c.env.DB.batch([update, hist])
+  return c.json({ ok: true })
+})
+
+// ── Aprobadores de una licencia (múltiples; CRUD) ───────────────────────────
+interface FilaAprobador {
+  id: number
+  licencia_id: number
+  nombre: string
+  email: string | null
+  creado_en: string
+}
+
+// Listado (visible si el usuario tiene acceso a la licencia).
+licencias.get('/:id/aprobadores', async (c) => {
+  const id = Number(c.req.param('id'))
+  if (!Number.isInteger(id)) return c.json({ error: 'Identificador inválido' }, 400)
+  const permiso = await permisoLicencias(c.env, c.get('actor') as Actor)
+  if (!puedeVer(permiso, id)) return c.json({ error: 'Licencia no encontrada' }, 404)
+  const filas = await consultar<FilaAprobador>(
+    c.env,
+    `SELECT id, licencia_id, nombre, email, creado_en FROM licencia_aprobadores
+     WHERE licencia_id = ? ORDER BY nombre COLLATE NOCASE`,
+    id,
+  )
+  return c.json({ aprobadores: filas })
+})
+
+// Gestión de aprobadores: solo admin/operador sin restricción de alcance.
+async function bloqueaRestringido(env: Env, actor: Actor): Promise<boolean> {
+  const permiso = await permisoLicencias(env, actor)
+  return permiso.restringido
+}
+
+licencias.post('/:id/aprobadores', requireRol('admin', 'operador'), async (c) => {
+  const id = Number(c.req.param('id'))
+  if (!Number.isInteger(id)) return c.json({ error: 'Identificador inválido' }, 400)
+  if (await bloqueaRestringido(c.env, c.get('actor') as Actor)) {
+    return c.json({ error: 'No tiene permisos para gestionar aprobadores' }, 403)
+  }
+  const lic = await primera<{ id: number; nombre_aplicacion: string }>(
+    c.env,
+    `SELECT id, nombre_aplicacion FROM licencias WHERE id = ?`,
+    id,
+  )
+  if (!lic) return c.json({ error: 'Licencia no encontrada' }, 404)
+
+  const parsed = aprobadorSchema.safeParse(await c.req.json().catch(() => null))
+  if (!parsed.success) return c.json({ error: errorZod(parsed.error) }, 400)
+  const actor = c.get('actor') as Actor
+  const ts = ahora()
+
+  const insert = c.env.DB.prepare(
+    `INSERT INTO licencia_aprobadores (licencia_id, nombre, email, creado_en) VALUES (?, ?, ?, ?)`,
+  ).bind(id, parsed.data.nombre, parsed.data.email ?? null, ts)
+  const hist = stmtHistorial(c.env, {
+    entidad: 'licencia',
+    entidadId: id,
+    licenciaId: id,
+    accion: 'EDITAR',
+    actor,
+    detalle: `Alta de aprobador "${parsed.data.nombre}" en "${lic.nombre_aplicacion}"`,
+    ip: c.get('ip'),
+  })
+  await c.env.DB.batch([insert, hist])
+  return c.json({ ok: true }, 201)
+})
+
+licencias.put('/:id/aprobadores/:apId', requireRol('admin', 'operador'), async (c) => {
+  const id = Number(c.req.param('id'))
+  const apId = Number(c.req.param('apId'))
+  if (!Number.isInteger(id) || !Number.isInteger(apId)) {
+    return c.json({ error: 'Identificador inválido' }, 400)
+  }
+  if (await bloqueaRestringido(c.env, c.get('actor') as Actor)) {
+    return c.json({ error: 'No tiene permisos para gestionar aprobadores' }, 403)
+  }
+  const ap = await primera<FilaAprobador>(
+    c.env,
+    `SELECT * FROM licencia_aprobadores WHERE id = ? AND licencia_id = ?`,
+    apId,
+    id,
+  )
+  if (!ap) return c.json({ error: 'Aprobador no encontrado' }, 404)
+
+  const parsed = aprobadorSchema.safeParse(await c.req.json().catch(() => null))
+  if (!parsed.success) return c.json({ error: errorZod(parsed.error) }, 400)
+  const actor = c.get('actor') as Actor
+
+  const update = c.env.DB.prepare(
+    `UPDATE licencia_aprobadores SET nombre = ?, email = ? WHERE id = ?`,
+  ).bind(parsed.data.nombre, parsed.data.email ?? null, apId)
+  const hist = stmtHistorial(c.env, {
+    entidad: 'licencia',
+    entidadId: id,
+    licenciaId: id,
+    accion: 'EDITAR',
+    actor,
+    detalle: `Edición de aprobador "${ap.nombre}" → "${parsed.data.nombre}"`,
+    ip: c.get('ip'),
+  })
+  await c.env.DB.batch([update, hist])
+  return c.json({ ok: true })
+})
+
+licencias.delete('/:id/aprobadores/:apId', requireRol('admin', 'operador'), async (c) => {
+  const id = Number(c.req.param('id'))
+  const apId = Number(c.req.param('apId'))
+  if (!Number.isInteger(id) || !Number.isInteger(apId)) {
+    return c.json({ error: 'Identificador inválido' }, 400)
+  }
+  if (await bloqueaRestringido(c.env, c.get('actor') as Actor)) {
+    return c.json({ error: 'No tiene permisos para gestionar aprobadores' }, 403)
+  }
+  const ap = await primera<FilaAprobador>(
+    c.env,
+    `SELECT * FROM licencia_aprobadores WHERE id = ? AND licencia_id = ?`,
+    apId,
+    id,
+  )
+  if (!ap) return c.json({ error: 'Aprobador no encontrado' }, 404)
+
+  const actor = c.get('actor') as Actor
+  const del = c.env.DB.prepare(`DELETE FROM licencia_aprobadores WHERE id = ?`).bind(apId)
+  const hist = stmtHistorial(c.env, {
+    entidad: 'licencia',
+    entidadId: id,
+    licenciaId: id,
+    accion: 'EDITAR',
+    actor,
+    detalle: `Eliminación de aprobador "${ap.nombre}"`,
+    ip: c.get('ip'),
+  })
+  await c.env.DB.batch([del, hist])
   return c.json({ ok: true })
 })

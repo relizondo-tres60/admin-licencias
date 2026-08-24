@@ -2,8 +2,9 @@
 // La bitácora es de solo lectura: no se exponen PUT ni DELETE.
 
 import { Hono } from 'hono'
-import type { Env, Variables } from '../tipos'
+import type { Env, Variables, Actor } from '../tipos'
 import { consultar, primera } from '../lib/db'
+import { permisoLicencias } from '../lib/alcance'
 
 export const historial = new Hono<{ Bindings: Env; Variables: Variables }>()
 
@@ -41,6 +42,16 @@ historial.get('/', async (c) => {
   if (q.aplicacion) {
     cond.push('lower(l.nombre_aplicacion) LIKE ?')
     params.push(`%${q.aplicacion.toLowerCase()}%`)
+  }
+
+  // Alcance: usuarios restringidos solo ven eventos de sus licencias autorizadas.
+  const permiso = await permisoLicencias(c.env, c.get('actor') as Actor)
+  if (permiso.restringido) {
+    if (permiso.ids.size === 0) cond.push('1 = 0')
+    else {
+      cond.push(`h.licencia_id IN (${Array.from(permiso.ids).map(() => '?').join(',')})`)
+      params.push(...permiso.ids)
+    }
   }
 
   const where = cond.length ? ` WHERE ${cond.join(' AND ')}` : ''

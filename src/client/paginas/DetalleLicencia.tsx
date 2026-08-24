@@ -9,11 +9,12 @@ import { Boton, Insignia, Tarjeta } from '../componentes/ui'
 import { Modal } from '../componentes/Modal'
 import { AsignacionesLicencia } from '../componentes/AsignacionesLicencia'
 import { HistorialLicencia } from '../componentes/HistorialLicencia'
+import { AprobadoresLicencia } from '../componentes/AprobadoresLicencia'
 import type { Licencia } from '../lib/tipos'
 import { ETIQUETA_TIPO, ETIQUETA_MODO } from '../lib/tipos'
 import { fecha, fechaHora } from '../lib/formato'
 
-type Pestana = 'ficha' | 'asignaciones' | 'historico'
+type Pestana = 'ficha' | 'aprobadores' | 'asignaciones' | 'historico'
 
 function Dato({ etiqueta, valor }: { etiqueta: string; valor: React.ReactNode }) {
   return (
@@ -29,7 +30,7 @@ export default function DetalleLicencia() {
   const toast = useToast()
   const qc = useQueryClient()
   const { data: sesion } = useSesion()
-  const permisos = puede(sesion?.usuario.rol)
+  const permisos = puede(sesion?.usuario)
   const [pestana, setPestana] = useState<Pestana>('ficha')
   const [confirmarBaja, setConfirmarBaja] = useState(false)
 
@@ -57,6 +58,7 @@ export default function DetalleLicencia() {
 
   const pestanas: { id: Pestana; etiqueta: string }[] = [
     { id: 'ficha', etiqueta: 'Ficha' },
+    { id: 'aprobadores', etiqueta: 'Aprobadores' },
     { id: 'asignaciones', etiqueta: 'Asignaciones vigentes' },
     { id: 'historico', etiqueta: 'Histórico' },
   ]
@@ -138,8 +140,7 @@ export default function DetalleLicencia() {
             )}
             <Dato etiqueta="Key user" valor={l.key_user_nombre} />
             <Dato etiqueta="Key user (email)" valor={l.key_user_email} />
-            <Dato etiqueta="Aprobador" valor={l.aprobador_nombre} />
-            <Dato etiqueta="Aprobador (email)" valor={l.aprobador_email} />
+            <Dato etiqueta="Aprobadores" valor={l.aprobadores} />
             <Dato etiqueta="Vencimiento" valor={fecha(l.fecha_vencimiento)} />
             <Dato etiqueta="Creada" valor={fechaHora(l.creado_en)} />
             <Dato etiqueta="Actualizada" valor={fechaHora(l.actualizado_en)} />
@@ -148,6 +149,9 @@ export default function DetalleLicencia() {
         </Tarjeta>
       )}
 
+      {pestana === 'aprobadores' && (
+        <AprobadoresLicencia licenciaId={l.id} puedeGestionar={permisos.gestionarAprobadores} />
+      )}
       {pestana === 'asignaciones' && (
         <AsignacionesLicencia licenciaId={l.id} puedeLiberar={permisos.asignar} />
       )}

@@ -37,7 +37,7 @@ export default function Maestro() {
   const toast = useToast()
   const qc = useQueryClient()
   const { data: sesion } = useSesion()
-  const permisos = puede(sesion?.usuario.rol)
+  const permisos = puede(sesion?.usuario)
   const [q, setQ] = useState('')
   const [soloActivos, setSoloActivos] = useState(true)
   const inputArchivo = useRef<HTMLInputElement>(null)

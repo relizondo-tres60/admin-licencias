@@ -13,8 +13,6 @@ export interface PayloadLicencia {
   ruta_archivo_licencia: string
   key_user_nombre: string
   key_user_email: string
-  aprobador_nombre: string
-  aprobador_email: string
   proveedor: string
   fecha_vencimiento: string
   notas: string
@@ -52,8 +50,6 @@ function estadoInicial(l?: Licencia): PayloadLicencia {
     ruta_archivo_licencia: l?.ruta_archivo_licencia ?? '',
     key_user_nombre: l?.key_user_nombre ?? '',
     key_user_email: l?.key_user_email ?? '',
-    aprobador_nombre: l?.aprobador_nombre ?? '',
-    aprobador_email: l?.aprobador_email ?? '',
     proveedor: l?.proveedor ?? '',
     fecha_vencimiento: l?.fecha_vencimiento ?? '',
     notas: l?.notas ?? '',
@@ -197,21 +193,6 @@ export function FormularioLicencia({
             className={claseInput}
             value={f.key_user_email}
             onChange={(e) => set('key_user_email', e.target.value)}
-          />
-        </Campo>
-        <Campo etiqueta="Aprobador (nombre)">
-          <input
-            className={claseInput}
-            value={f.aprobador_nombre}
-            onChange={(e) => set('aprobador_nombre', e.target.value)}
-          />
-        </Campo>
-        <Campo etiqueta="Aprobador (email)">
-          <input
-            type="email"
-            className={claseInput}
-            value={f.aprobador_email}
-            onChange={(e) => set('aprobador_email', e.target.value)}
           />
         </Campo>
         <Campo etiqueta="Fecha de vencimiento">

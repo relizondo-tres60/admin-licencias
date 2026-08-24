@@ -1,13 +1,26 @@
 // Reportes con filtros combinables. Devuelven filas en JSON; la exportación a
 // XLSX/CSV se genera en el cliente con SheetJS.
+// Respetan el alcance por licencia del usuario (usuarios restringidos solo ven
+// sus licencias autorizadas).
 
 import { Hono } from 'hono'
-import type { Env, Variables } from '../tipos'
+import type { Env, Variables, Actor } from '../tipos'
 import { consultar } from '../lib/db'
+import { permisoLicencias, type Permiso } from '../lib/alcance'
 
 export const reportes = new Hono<{ Bindings: Env; Variables: Variables }>()
 
 const VIG = `LEFT JOIN (SELECT licencia_id, COUNT(*) n FROM asignaciones WHERE estado='asignada' GROUP BY licencia_id) v ON v.licencia_id = l.id`
+
+const APROBADORES = `(SELECT group_concat(nombre, ', ') FROM licencia_aprobadores ap WHERE ap.licencia_id = l.id)`
+
+// Condición de alcance sobre una columna de licencia_id.
+function condAlcance(p: Permiso, columna: string): { cond: string[]; params: unknown[] } {
+  if (!p.restringido) return { cond: [], params: [] }
+  if (p.ids.size === 0) return { cond: ['1 = 0'], params: [] }
+  const marcas = Array.from(p.ids).map(() => '?').join(',')
+  return { cond: [`${columna} IN (${marcas})`], params: Array.from(p.ids) }
+}
 
 function filtrosLicencia(q: Record<string, string>) {
   const cond: string[] = []
@@ -23,7 +36,9 @@ function filtrosLicencia(q: Record<string, string>) {
     params.push(`%${q.aplicacion.toLowerCase()}%`)
   }
   if (q.aprobador) {
-    cond.push('lower(l.aprobador_nombre) LIKE ?')
+    cond.push(
+      `EXISTS (SELECT 1 FROM licencia_aprobadores ap WHERE ap.licencia_id = l.id AND lower(ap.nombre) LIKE ?)`,
+    )
     params.push(`%${q.aprobador.toLowerCase()}%`)
   }
   return { cond, params }
@@ -32,17 +47,21 @@ function filtrosLicencia(q: Record<string, string>) {
 // Inventario general con disponibilidad
 reportes.get('/inventario', async (c) => {
   const { cond, params } = filtrosLicencia(c.req.query())
-  const where = cond.length ? ` WHERE ${cond.join(' AND ')}` : ''
+  const p = await permisoLicencias(c.env, c.get('actor') as Actor)
+  const al = condAlcance(p, 'l.id')
+  const todas = [...cond, ...al.cond]
+  const where = todas.length ? ` WHERE ${todas.join(' AND ')}` : ''
   const filas = await consultar(
     c.env,
     `SELECT l.nombre_aplicacion AS aplicacion, l.version, l.tipo, l.proveedor,
             l.cantidad_total AS total, COALESCE(v.n,0) AS asignadas,
             (l.cantidad_total - COALESCE(v.n,0)) AS disponibles,
-            l.key_user_nombre AS key_user, l.aprobador_nombre AS aprobador,
+            l.key_user_nombre AS key_user, ${APROBADORES} AS aprobador,
             l.fecha_vencimiento, CASE l.activo WHEN 1 THEN 'Activa' ELSE 'Baja' END AS estado
      FROM licencias l ${VIG}${where}
      ORDER BY l.nombre_aplicacion COLLATE NOCASE`,
     ...params,
+    ...al.params,
   )
   return c.json({ filas })
 })
@@ -72,6 +91,10 @@ reportes.get('/asignaciones-vigentes', async (c) => {
     cond.push('lower(a.aprobador) LIKE ?')
     params.push(`%${q.aprobador.toLowerCase()}%`)
   }
+  const p = await permisoLicencias(c.env, c.get('actor') as Actor)
+  const al = condAlcance(p, 'a.licencia_id')
+  cond.push(...al.cond)
+  params.push(...al.params)
   const filas = await consultar(
     c.env,
     `SELECT l.nombre_aplicacion AS aplicacion, l.tipo, m.nombre AS usuario,
@@ -104,6 +127,10 @@ reportes.get('/movimientos', async (c) => {
     cond.push('lower(l.nombre_aplicacion) LIKE ?')
     params.push(`%${q.aplicacion.toLowerCase()}%`)
   }
+  const p = await permisoLicencias(c.env, c.get('actor') as Actor)
+  const al = condAlcance(p, 'h.licencia_id')
+  cond.push(...al.cond)
+  params.push(...al.params)
   const filas = await consultar(
     c.env,
     `SELECT h.ts AS fecha, h.accion, l.nombre_aplicacion AS aplicacion,
@@ -120,7 +147,10 @@ reportes.get('/movimientos', async (c) => {
 // Utilización por aplicación (%)
 reportes.get('/utilizacion', async (c) => {
   const { cond, params } = filtrosLicencia({ ...c.req.query(), estado: 'activas' })
-  const where = cond.length ? ` WHERE ${cond.join(' AND ')}` : ''
+  const p = await permisoLicencias(c.env, c.get('actor') as Actor)
+  const al = condAlcance(p, 'l.id')
+  const todas = [...cond, ...al.cond]
+  const where = todas.length ? ` WHERE ${todas.join(' AND ')}` : ''
   const filas = await consultar(
     c.env,
     `SELECT l.nombre_aplicacion AS aplicacion, l.tipo, l.cantidad_total AS total,
@@ -130,6 +160,7 @@ reportes.get('/utilizacion', async (c) => {
      FROM licencias l ${VIG}${where}
      ORDER BY utilizacion DESC, l.nombre_aplicacion COLLATE NOCASE`,
     ...params,
+    ...al.params,
   )
   return c.json({ filas })
 })
@@ -148,10 +179,14 @@ reportes.get('/por-vencer', async (c) => {
     cond.push('l.tipo = ?')
     params.push(q.tipo)
   }
+  const p = await permisoLicencias(c.env, c.get('actor') as Actor)
+  const al = condAlcance(p, 'l.id')
+  cond.push(...al.cond)
+  params.push(...al.params)
   const filas = await consultar(
     c.env,
     `SELECT l.nombre_aplicacion AS aplicacion, l.tipo, l.proveedor,
-            l.fecha_vencimiento, l.aprobador_nombre AS aprobador,
+            l.fecha_vencimiento, ${APROBADORES} AS aprobador,
             l.cantidad_total AS total
      FROM licencias l
      WHERE ${cond.join(' AND ')}

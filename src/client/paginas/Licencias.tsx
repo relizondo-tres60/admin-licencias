@@ -18,7 +18,7 @@ export default function Licencias() {
   const toast = useToast()
   const qc = useQueryClient()
   const { data: sesion } = useSesion()
-  const permisos = puede(sesion?.usuario.rol)
+  const permisos = puede(sesion?.usuario)
 
   const [q, setQ] = useState('')
   const [tipo, setTipo] = useState('')
@@ -162,7 +162,7 @@ export default function Licencias() {
                       </span>
                     </td>
                     <td className="py-2 pr-4 text-slate-600">{l.key_user_nombre ?? '—'}</td>
-                    <td className="py-2 pr-4 text-slate-600">{l.aprobador_nombre ?? '—'}</td>
+                    <td className="py-2 pr-4 text-slate-600">{l.aprobadores ?? '—'}</td>
                     <td className="py-2 pr-4 text-slate-600">{fecha(l.fecha_vencimiento)}</td>
                     {permisos.editarLicencias && (
                       <td className="py-2 pr-4 text-right">

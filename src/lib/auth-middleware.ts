@@ -23,6 +23,7 @@ interface FilaUsuario {
   nombre: string
   rol: Rol
   activo: number
+  alcance: 'todas' | 'seleccion'
   ultimo_acceso: string | null
 }
 
@@ -61,7 +62,7 @@ async function resolverActor(env: Env, email: string, ip: string): Promise<Actor
   const admins = correosAdmin(env)
   let fila = await primera<FilaUsuario>(
     env,
-    `SELECT id, email, nombre, rol, activo, ultimo_acceso FROM usuarios_app WHERE email = ?`,
+    `SELECT id, email, nombre, rol, activo, alcance, ultimo_acceso FROM usuarios_app WHERE email = ?`,
     email,
   )
 
@@ -78,7 +79,7 @@ async function resolverActor(env: Env, email: string, ip: string): Promise<Actor
     ])
     fila = await primera<FilaUsuario>(
       env,
-      `SELECT id, email, nombre, rol, activo, ultimo_acceso FROM usuarios_app WHERE email = ?`,
+      `SELECT id, email, nombre, rol, activo, alcance, ultimo_acceso FROM usuarios_app WHERE email = ?`,
       email,
     )
     if (fila) {
@@ -115,7 +116,13 @@ async function resolverActor(env: Env, email: string, ip: string): Promise<Actor
   }
   await env.DB.batch(ops)
 
-  return { id: fila.id, email: fila.email, nombre: fila.nombre, rol: fila.rol }
+  return {
+    id: fila.id,
+    email: fila.email,
+    nombre: fila.nombre,
+    rol: fila.rol,
+    alcance: fila.alcance ?? 'todas',
+  }
 }
 
 /** Middleware que exige sesión válida y deja el actor en el contexto. */

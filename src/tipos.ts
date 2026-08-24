@@ -16,6 +16,7 @@ export interface Actor {
   email: string
   nombre: string
   rol: Rol
+  alcance: 'todas' | 'seleccion'
 }
 
 // Variables que el middleware de auth deja disponibles en el contexto Hono

@@ -8,6 +8,7 @@ import { requireRol } from '../lib/auth-middleware'
 import { ahora, consultar, primera } from '../lib/db'
 import { stmtHistorial } from '../lib/historial'
 import { asignacionSchema, liberacionSchema } from '../lib/validaciones'
+import { permisoLicencias, puedeVer } from '../lib/alcance'
 
 export const asignaciones = new Hono<{ Bindings: Env; Variables: Variables }>()
 
@@ -37,6 +38,15 @@ asignaciones.get('/', async (c) => {
   if (estado === 'asignada' || estado === 'liberada') {
     cond.push('a.estado = ?')
     params.push(estado)
+  }
+  // Alcance: solo asignaciones de licencias autorizadas.
+  const permiso = await permisoLicencias(c.env, c.get('actor') as Actor)
+  if (permiso.restringido) {
+    if (permiso.ids.size === 0) cond.push('1 = 0')
+    else {
+      cond.push(`a.licencia_id IN (${Array.from(permiso.ids).map(() => '?').join(',')})`)
+      params.push(...permiso.ids)
+    }
   }
   const where = cond.length ? ` WHERE ${cond.join(' AND ')}` : ''
   const filas = await consultar(
@@ -71,6 +81,12 @@ asignaciones.post('/', requireRol('admin', 'operador'), async (c) => {
   )
   if (!lic) return c.json({ error: 'Licencia no encontrada' }, 404)
   if (lic.activo !== 1) return c.json({ error: 'La licencia está dada de baja' }, 409)
+
+  // Alcance: solo puede asignar licencias autorizadas.
+  const permisoAsig = await permisoLicencias(c.env, actor)
+  if (!puedeVer(permisoAsig, d.licencia_id)) {
+    return c.json({ error: 'No tiene permisos para asignar esta licencia.' }, 403)
+  }
 
   // Regla 7: usuario del maestro debe existir y estar activo.
   const usuario = await primera<{ id: number; nombre: string; activo: number }>(
@@ -201,6 +217,13 @@ asignaciones.put('/:id/liberar', requireRol('admin', 'operador'), async (c) => {
   }
 
   const actor = c.get('actor') as Actor
+
+  // Alcance: solo puede liberar asignaciones de licencias autorizadas.
+  const permisoLib = await permisoLicencias(c.env, actor)
+  if (!puedeVer(permisoLib, asig.licencia_id)) {
+    return c.json({ error: 'No tiene permisos para liberar esta asignación.' }, 403)
+  }
+
   const ts = ahora()
 
   // Regla 4: liberar no borra; cambia estado y registra datos de liberación.

@@ -117,7 +117,16 @@ export const asignacionSchema = z.object({
   observacion_asignacion: textoOpcional,
 })
 
-// ── Usuarios del sistema (roles) ────────────────────────────────────────────
+// ── Aprobadores de licencia ─────────────────────────────────────────────────
+export const aprobadorSchema = z.object({
+  nombre: z.string().trim().min(1, 'El nombre del aprobador es obligatorio'),
+  email: emailOpcional,
+})
+
+// ── Usuarios del sistema (roles + alcance por licencia) ─────────────────────
+const alcanceEnum = z.enum(['todas', 'seleccion']).default('todas')
+const licenciasArray = z.array(z.number().int().positive()).default([])
+
 export const usuarioAppSchema = z.object({
   email: z
     .string()
@@ -128,6 +137,8 @@ export const usuarioAppSchema = z.object({
   rol: z.enum(['admin', 'operador', 'consulta'], {
     errorMap: () => ({ message: 'Rol inválido' }),
   }),
+  alcance: alcanceEnum,
+  licencias: licenciasArray,
 })
 
 export const usuarioAppUpdateSchema = z.object({
@@ -136,6 +147,8 @@ export const usuarioAppUpdateSchema = z.object({
     errorMap: () => ({ message: 'Rol inválido' }),
   }),
   activo: z.boolean(),
+  alcance: alcanceEnum,
+  licencias: licenciasArray,
 })
 
 export const liberacionSchema = z.object({

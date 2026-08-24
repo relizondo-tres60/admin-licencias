@@ -2,8 +2,9 @@
 // últimos movimientos. Filtro global opcional por tipo y por aplicación.
 
 import { Hono } from 'hono'
-import type { Env, Variables } from '../tipos'
+import type { Env, Variables, Actor } from '../tipos'
 import { consultar, primera } from '../lib/db'
+import { permisoLicencias } from '../lib/alcance'
 
 export const dashboard = new Hono<{ Bindings: Env; Variables: Variables }>()
 
@@ -21,6 +22,17 @@ dashboard.get('/', async (c) => {
   if (aplicacion) {
     cond.push('lower(l.nombre_aplicacion) LIKE ?')
     params.push(`%${aplicacion}%`)
+  }
+
+  // Alcance: usuarios restringidos solo ven sus licencias autorizadas.
+  const permiso = await permisoLicencias(c.env, c.get('actor') as Actor)
+  const idsRestringidos = permiso.restringido ? Array.from(permiso.ids) : null
+  if (permiso.restringido) {
+    if (permiso.ids.size === 0) cond.push('1 = 0')
+    else {
+      cond.push(`l.id IN (${idsRestringidos!.map(() => '?').join(',')})`)
+      params.push(...idsRestringidos!)
+    }
   }
   const where = cond.join(' AND ')
 
@@ -97,25 +109,40 @@ dashboard.get('/', async (c) => {
     id: number
     nombre_aplicacion: string
     key_user_nombre: string | null
-    aprobador_nombre: string | null
+    sin_aprobador: number
   }>(
     c.env,
-    `SELECT l.id, l.nombre_aplicacion, l.key_user_nombre, l.aprobador_nombre
+    `SELECT l.id, l.nombre_aplicacion, l.key_user_nombre,
+            (NOT EXISTS (SELECT 1 FROM licencia_aprobadores ap WHERE ap.licencia_id = l.id)) AS sin_aprobador
      FROM licencias l
-     WHERE ${where} AND (l.key_user_nombre IS NULL OR l.aprobador_nombre IS NULL)
+     WHERE ${where}
+       AND (l.key_user_nombre IS NULL
+            OR NOT EXISTS (SELECT 1 FROM licencia_aprobadores ap WHERE ap.licencia_id = l.id))
      ORDER BY l.nombre_aplicacion COLLATE NOCASE`,
     ...params,
   )
 
-  // Últimos 10 movimientos
+  // Últimos 10 movimientos (restringidos solo a sus licencias autorizadas).
+  const condMov: string[] = []
+  const paramsMov: unknown[] = []
+  if (idsRestringidos) {
+    if (idsRestringidos.length === 0) condMov.push('1 = 0')
+    else {
+      condMov.push(`h.licencia_id IN (${idsRestringidos.map(() => '?').join(',')})`)
+      paramsMov.push(...idsRestringidos)
+    }
+  }
+  const whereMov = condMov.length ? ` WHERE ${condMov.join(' AND ')}` : ''
   const movimientos = await consultar(
     c.env,
     `SELECT h.id, h.ts, h.accion, h.entidad, h.detalle, h.usuario_app_email,
             l.nombre_aplicacion
      FROM historial h
      LEFT JOIN licencias l ON l.id = h.licencia_id
+     ${whereMov}
      ORDER BY h.id DESC
      LIMIT 10`,
+    ...paramsMov,
   )
 
   return c.json({

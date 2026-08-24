@@ -55,12 +55,16 @@ autenticacion.get('/callback', async (c) => {
 
 autenticacion.get('/logout', () => redirect('/', [cookieSesion('', true)]))
 
-// Diagnóstico: reporta qué variables/secrets ve el Worker (solo booleanos).
-autenticacion.get('/estado', (c) =>
-  c.json({
+// Diagnóstico: reporta qué variables/secrets ve el Worker (solo booleanos) y el
+// redirect_uri exacto que se envía a Google (para comparar con el registrado).
+autenticacion.get('/estado', (c) => {
+  const url = new URL(c.req.url)
+  return c.json({
     entorno: c.env.ENTORNO,
     google_client_id: !!c.env.GOOGLE_CLIENT_ID,
+    client_id_sufijo: (c.env.GOOGLE_CLIENT_ID ?? '').slice(0, 20),
     google_client_secret: !!c.env.GOOGLE_CLIENT_SECRET,
     jwt_secret: !!c.env.JWT_SECRET,
-  }),
-)
+    redirect_uri: `${url.origin}/api/auth/callback`,
+  })
+})

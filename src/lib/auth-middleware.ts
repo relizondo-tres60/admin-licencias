@@ -26,13 +26,25 @@ interface FilaUsuario {
   ultimo_acceso: string | null
 }
 
+/** Conjunto de correos administradores semilla (ADMIN_EMAIL admite lista
+ *  separada por comas). Todos se autopromueven a 'admin' en su primer acceso. */
+function correosAdmin(env: Env): Set<string> {
+  return new Set(
+    (env.ADMIN_EMAIL ?? '')
+      .split(',')
+      .map((e) => e.trim().toLowerCase())
+      .filter(Boolean),
+  )
+}
+
 /** Extrae el correo autenticado según el entorno. */
 async function obtenerEmail(env: Env, headers: Headers): Promise<string | null> {
   if (env.ENTORNO === 'dev') {
     const dev = headers.get('x-dev-email')?.trim().toLowerCase()
     if (dev) return dev
-    if (env.ADMIN_EMAIL) return env.ADMIN_EMAIL.trim().toLowerCase()
-    return null
+    // Fallback dev: primer correo administrador de la lista.
+    const [primero] = correosAdmin(env)
+    return primero ?? null
   }
   const token = headers.get('cf-access-jwt-assertion')
   if (!token) return null
@@ -46,7 +58,7 @@ async function obtenerEmail(env: Env, headers: Headers): Promise<string | null> 
  * la primera vez y cuando cambia el día de acceso.
  */
 async function resolverActor(env: Env, email: string, ip: string): Promise<Actor | null> {
-  const adminEmail = env.ADMIN_EMAIL?.trim().toLowerCase() ?? ''
+  const admins = correosAdmin(env)
   let fila = await primera<FilaUsuario>(
     env,
     `SELECT id, email, nombre, rol, activo, ultimo_acceso FROM usuarios_app WHERE email = ?`,
@@ -56,8 +68,8 @@ async function resolverActor(env: Env, email: string, ip: string): Promise<Actor
   const ts = ahora()
 
   if (!fila) {
-    // Solo el administrador semilla se autoaprovisiona. El resto lo crea un admin.
-    if (email !== adminEmail) return null
+    // Solo los administradores semilla se autoaprovisionan. El resto lo crea un admin.
+    if (!admins.has(email)) return null
     await env.DB.batch([
       env.DB.prepare(
         `INSERT INTO usuarios_app (email, nombre, rol, activo, ultimo_acceso, creado_en)

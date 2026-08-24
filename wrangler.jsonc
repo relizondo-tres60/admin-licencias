@@ -4,10 +4,12 @@
   "main": "src/index.ts",
   "compatibility_date": "2025-01-15",
 
-  // Frontend estático (Cloudflare Assets). El Worker resuelve el fallback SPA.
+  // Frontend estático (Cloudflare Assets). El Worker corre primero para poder
+  // proteger /usuarios.xlsx (solo usuarios autenticados) y resolver el fallback SPA.
   "assets": {
     "directory": "./dist/client",
-    "binding": "ASSETS"
+    "binding": "ASSETS",
+    "run_worker_first": true
   },
 
   // Base de datos D1.
@@ -31,7 +33,7 @@
     // GOOGLE_CLIENT_SECRET y JWT_SECRET se cargan como *secrets* (no van aquí):
     //   npx wrangler secret put GOOGLE_CLIENT_SECRET
     //   npx wrangler secret put JWT_SECRET
-    "GOOGLE_CLIENT_ID": "PEGAR_GOOGLE_CLIENT_ID"
+    "GOOGLE_CLIENT_ID": "315729524504-fiqum8njf1pi96j7j5nq06ng79p1qkgv.apps.googleusercontent.com"
   },
 
   "observability": {
@@ -56,7 +58,8 @@
       ],
       "assets": {
         "directory": "./dist/client",
-        "binding": "ASSETS"
+        "binding": "ASSETS",
+        "run_worker_first": true
       }
     }
   }

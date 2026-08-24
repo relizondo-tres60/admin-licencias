@@ -33,7 +33,9 @@ function IconoGoogle() {
 export default function Login() {
   const params = new URLSearchParams(window.location.search)
   const error = params.get('error')
-  const mensaje = error ? (MENSAJES[error] ?? 'No se pudo iniciar sesión.') : null
+  const motivo = params.get('motivo')
+  const base = error ? (MENSAJES[error] ?? 'No se pudo iniciar sesión.') : null
+  const mensaje = base && motivo ? `${base} (detalle: ${motivo})` : base
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-marca-800 via-marca-700 to-marca-600 p-4">

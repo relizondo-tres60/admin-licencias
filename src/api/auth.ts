@@ -39,8 +39,11 @@ autenticacion.get('/callback', async (c) => {
   if (!code) return redirect('/?error=google', [cookieEstado('', true)])
 
   const redirectUri = `${url.origin}/api/auth/callback`
-  const identidad = await intercambiarCodigo(c.env, code, redirectUri)
-  if (!identidad) return redirect('/?error=google', [cookieEstado('', true)])
+  const r = await intercambiarCodigo(c.env, code, redirectUri)
+  if ('error' in r) {
+    return redirect(`/?error=google&motivo=${encodeURIComponent(r.error)}`, [cookieEstado('', true)])
+  }
+  const identidad = r.identidad
 
   const ip = c.req.header('cf-connecting-ip') ?? ''
   const actor = await resolverActor(c.env, identidad.email, ip)

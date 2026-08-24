@@ -37,16 +37,22 @@ export interface IdentidadGoogle {
   name?: string
 }
 
+export type ResultadoCanje = { identidad: IdentidadGoogle } | { error: string }
+
 /**
  * Canjea el código de autorización por el id_token de Google y valida sus
  * claims (aud, iss, exp, email_verified). El id_token llega directo del token
  * endpoint de Google por TLS, por lo que la validación de claims es suficiente.
+ * Devuelve un motivo corto en caso de fallo (para diagnóstico).
  */
 export async function intercambiarCodigo(
   env: Env,
   code: string,
   redirectUri: string,
-): Promise<IdentidadGoogle | null> {
+): Promise<ResultadoCanje> {
+  if (!env.GOOGLE_CLIENT_SECRET) return { error: 'falta_client_secret' }
+  if (!env.JWT_SECRET) return { error: 'falta_jwt_secret' }
+
   const resp = await fetch(TOKEN, {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -58,12 +64,22 @@ export async function intercambiarCodigo(
       grant_type: 'authorization_code',
     }).toString(),
   })
-  if (!resp.ok) return null
+  if (!resp.ok) {
+    const cuerpo = await resp.text()
+    console.error('Google token endpoint error', resp.status, cuerpo)
+    let motivo = `http_${resp.status}`
+    try {
+      motivo = (JSON.parse(cuerpo).error as string) || motivo
+    } catch {
+      /* cuerpo no-JSON */
+    }
+    return { error: motivo }
+  }
   const data = (await resp.json()) as { id_token?: string }
-  if (!data.id_token) return null
+  if (!data.id_token) return { error: 'sin_id_token' }
 
   const claims = decodificarPayload(data.id_token)
-  if (!claims) return null
+  if (!claims) return { error: 'id_token_ilegible' }
 
   const aud = claims.aud as string | undefined
   const iss = claims.iss as string | undefined
@@ -72,11 +88,13 @@ export async function intercambiarCodigo(
   const emailVerificado = claims.email_verified as boolean | string | undefined
   const name = claims.name as string | undefined
 
-  if (aud !== env.GOOGLE_CLIENT_ID) return null
-  if (!iss || !ISS_VALIDOS.includes(iss)) return null
-  if (exp && exp * 1000 < Date.now()) return null
-  if (!email) return null
-  if (emailVerificado === false || emailVerificado === 'false') return null
+  if (aud !== env.GOOGLE_CLIENT_ID) return { error: 'aud_invalida' }
+  if (!iss || !ISS_VALIDOS.includes(iss)) return { error: 'iss_invalida' }
+  if (exp && exp * 1000 < Date.now()) return { error: 'expirado' }
+  if (!email) return { error: 'sin_email' }
+  if (emailVerificado === false || emailVerificado === 'false') {
+    return { error: 'email_no_verificado' }
+  }
 
-  return { email: email.toLowerCase(), name }
+  return { identidad: { email: email.toLowerCase(), name } }
 }

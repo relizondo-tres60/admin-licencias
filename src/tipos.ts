@@ -5,8 +5,10 @@ export interface Env {
   ASSETS: Fetcher
   ENTORNO: string
   ADMIN_EMAIL: string
-  ACCESS_TEAM_DOMAIN: string
-  ACCESS_AUD: string
+  // Inicio de sesión con Google (OIDC) + sesión propia.
+  GOOGLE_CLIENT_ID: string
+  GOOGLE_CLIENT_SECRET: string
+  JWT_SECRET: string
 }
 
 export type Rol = 'admin' | 'operador' | 'consulta'

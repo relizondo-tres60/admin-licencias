@@ -51,8 +51,13 @@ export default function Layout() {
         <div className="border-t border-marca-700 px-5 py-3 text-xs">
           <div className="font-medium">{usuario?.nombre ?? '—'}</div>
           <div className="text-marca-100/70">{usuario?.email}</div>
-          <div className="mt-1 inline-block rounded bg-marca-600 px-2 py-0.5 uppercase tracking-wide">
-            {usuario?.rol ?? '—'}
+          <div className="mt-1 flex items-center justify-between">
+            <span className="inline-block rounded bg-marca-600 px-2 py-0.5 uppercase tracking-wide">
+              {usuario?.rol ?? '—'}
+            </span>
+            <a href="/api/auth/logout" className="text-marca-100/80 hover:text-white hover:underline">
+              Cerrar sesión
+            </a>
           </div>
         </div>
       </aside>

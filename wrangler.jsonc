@@ -27,10 +27,11 @@
     // Administradores semilla (lista separada por comas): cada uno se
     // autopromueve a rol 'admin' en su primer ingreso.
     "ADMIN_EMAIL": "relizondo@tres60.cl,rodrigo.a.elizondo@gmail.com,oblanco@tres60.cl",
-    // Cloudflare Access (Zero Trust) — app self-hosted sobre
-    // https://admin-licencias.relizondo-0d3.workers.dev
-    "ACCESS_TEAM_DOMAIN": "cc-licencias.cloudflareaccess.com",
-    "ACCESS_AUD": "481157c735be0b331483f7fbf44b92efe385e5f045c8430f4271719567d3b972"
+    // Inicio de sesión con Google (OIDC). El Client ID no es secreto.
+    // GOOGLE_CLIENT_SECRET y JWT_SECRET se cargan como *secrets* (no van aquí):
+    //   npx wrangler secret put GOOGLE_CLIENT_SECRET
+    //   npx wrangler secret put JWT_SECRET
+    "GOOGLE_CLIENT_ID": "PEGAR_GOOGLE_CLIENT_ID"
   },
 
   "observability": {
@@ -43,8 +44,7 @@
       "vars": {
         "ENTORNO": "dev",
         "ADMIN_EMAIL": "relizondo@tres60.cl,rodrigo.a.elizondo@gmail.com,oblanco@tres60.cl",
-        "ACCESS_TEAM_DOMAIN": "",
-        "ACCESS_AUD": ""
+        "GOOGLE_CLIENT_ID": ""
       },
       "d1_databases": [
         {

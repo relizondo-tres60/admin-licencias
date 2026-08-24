@@ -1,7 +1,8 @@
 import { Routes, Route } from 'react-router-dom'
 import Layout from './componentes/Layout'
-import { Cargando, ErrorMsg, EnConstruccion } from './componentes/Estado'
+import { Cargando, EnConstruccion } from './componentes/Estado'
 import { useSesion } from './lib/sesion'
+import Login from './paginas/Login'
 import Maestro from './paginas/Maestro'
 import Licencias from './paginas/Licencias'
 import DetalleLicencia from './paginas/DetalleLicencia'
@@ -15,20 +16,8 @@ export default function App() {
   const { isLoading, error } = useSesion()
 
   if (isLoading) return <Cargando texto="Verificando acceso…" />
-  if (error) {
-    return (
-      <div className="mx-auto max-w-lg p-8">
-        <h1 className="mb-4 text-xl font-semibold text-marca-800">
-          Administración de Licencias · Tres60
-        </h1>
-        <ErrorMsg error={error} />
-        <p className="mt-4 text-sm text-slate-500">
-          El acceso a la aplicación se gestiona mediante Cloudflare Access. Si el
-          problema persiste, contacte al administrador del sistema.
-        </p>
-      </div>
-    )
-  }
+  // Sin sesión válida (401/403) → pantalla de login con Google.
+  if (error) return <Login />
 
   return (
     <Routes>

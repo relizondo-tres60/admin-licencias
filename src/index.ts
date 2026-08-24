@@ -4,6 +4,7 @@
 import { Hono } from 'hono'
 import type { Env, Variables } from './tipos'
 import { auth } from './lib/auth-middleware'
+import { autenticacion } from './api/auth'
 import { sesion } from './api/sesion'
 import { maestro } from './api/maestro'
 import { licencias } from './api/licencias'
@@ -37,6 +38,9 @@ app.use('*', async (c, next) => {
     ].join('; '),
   )
 })
+
+// ── Autenticación (rutas públicas, sin sesión previa) ───────────────────────
+app.route('/api/auth', autenticacion)
 
 // ── API ─────────────────────────────────────────────────────────────────────
 const api = new Hono<{ Bindings: Env; Variables: Variables }>()

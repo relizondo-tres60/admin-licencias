@@ -1,12 +1,17 @@
 # Copiar a .dev.vars (ignorado por git) para desarrollo local.
-# En producción estas variables se configuran en Cloudflare (vars y/o secrets).
+# En producción estas variables se configuran en Cloudflare (vars y secrets).
 
-# Entorno local: 'dev' habilita el bypass de Access (X-Dev-Email / ADMIN_EMAIL).
+# Entorno local: 'dev' habilita el bypass de login (X-Dev-Email / ADMIN_EMAIL),
+# así no necesitas Google en local.
 ENTORNO="dev"
 
-# Correo del administrador semilla: se promueve a rol 'admin' en su primer acceso.
-ADMIN_EMAIL="rodrigo.a.elizondo@gmail.com"
+# Administradores semilla (lista separada por comas): se promueven a 'admin'.
+ADMIN_EMAIL="relizondo@tres60.cl"
 
-# Cloudflare Access (Zero Trust). En local se puede dejar vacío y usar el bypass dev.
-ACCESS_TEAM_DOMAIN=""
-ACCESS_AUD=""
+# Inicio de sesión con Google (OIDC). En local puedes dejarlos vacíos (se usa el
+# bypass). En producción: GOOGLE_CLIENT_ID como var y los otros dos como secrets.
+GOOGLE_CLIENT_ID=""
+GOOGLE_CLIENT_SECRET=""
+
+# Secreto para firmar la cookie de sesión. Genera uno con: openssl rand -base64 32
+JWT_SECRET="dev-secret-solo-local"

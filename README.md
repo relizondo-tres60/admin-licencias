@@ -23,7 +23,7 @@ operativa > estética**.
 | Frontend | React + Vite + TypeScript, Tailwind CSS |
 | Gráficos | Recharts |
 | Excel | SheetJS (`xlsx`) |
-| Auth | Cloudflare Access (Zero Trust) + roles en D1 |
+| Auth | Google (OIDC) + sesión propia (JWT HS256) + roles en D1 |
 
 Un solo Worker sirve la API (`/api/*`) y el frontend (binding `ASSETS`), sin CORS
 ni dominios separados.
@@ -39,7 +39,7 @@ ni dominios separados.
 │  ├─ index.ts                 # Hono: API + assets con fallback SPA
 │  ├─ api/                     # sesion, maestro, licencias, asignaciones,
 │  │                           # dashboard, historial, reportes, usuarios
-│  ├─ lib/                     # access (JWKS), auth-middleware, db, historial,
+│  ├─ lib/                     # oidc (Google), session, auth-middleware, db,
 │  │                           # xlsx-maestro, maestro-sync, validaciones (Zod)
 │  └─ client/                  # aplicación React
 └─ wrangler.jsonc
@@ -78,7 +78,7 @@ npm run dev                  # Worker (8787) + Vite (5173) con proxy /api
 ```
 
 Abra `http://127.0.0.1:5173`. En desarrollo el acceso usa un **bypass local**
-(no requiere Zero Trust): se toma `ADMIN_EMAIL` de `.dev.vars`, o la cabecera
+(no requiere Google): se toma `ADMIN_EMAIL` de `.dev.vars`, o la cabecera
 `X-Dev-Email`. Para simular otro usuario desde el navegador:
 
 ```js
@@ -90,38 +90,39 @@ localStorage.setItem('dev-email', 'oper@empresa.cl')  // recargar la página
 
 ---
 
-## Autenticación y siembra del administrador
+## Autenticación (Google) y siembra del administrador
 
-El acceso se controla con **Cloudflare Access (Zero Trust)**: Access valida al
-usuario en el edge e inyecta un JWT que el Worker verifica contra el JWKS del
-equipo (`ACCESS_TEAM_DOMAIN`, `ACCESS_AUD`), comprobando firma RS256, audiencia
-y expiración (con caché de 1 hora).
+El **único método de inicio de sesión es Google (OIDC)**, implementado dentro de
+la propia app: el usuario ve una pantalla de login a medida con "Continuar con
+Google". El Worker canja el código en el token endpoint de Google, valida el
+`id_token` (aud/iss/exp/email verificado) y emite su **propia sesión** (JWT
+HS256 firmado con `JWT_SECRET`) en cookie `HttpOnly; Secure; SameSite=Lax`, con
+expiración de 8 horas. No se usa Cloudflare Access.
 
-**No hay contraseñas** en la aplicación: no se almacenan hashes ni se gestionan
-restablecimientos. El rol (`admin` / `operador` / `consulta`) se administra en la
-tabla `usuarios_app`.
+**No hay contraseñas** en la aplicación. El rol (`admin` / `operador` /
+`consulta`) y el alcance por licencia se administran en la tabla `usuarios_app`.
 
-**Siembra del administrador:** no se ejecuta ningún script. El correo definido en
-`ADMIN_EMAIL` se promueve automáticamente a `admin` la primera vez que ingresa.
-Desde ahí, ese administrador da de alta al resto de los usuarios y sus roles en
-la pantalla *Usuarios del sistema*.
+**Siembra del administrador:** el/los correo(s) de `ADMIN_EMAIL` (lista separada
+por comas) se promueven a `admin` en su primer ingreso. Desde ahí administran al
+resto de los usuarios en *Usuarios del sistema*.
 
-### Configuración de Access (producción)
+### Configuración de Google (producción)
 
-En el panel de Cloudflare Zero Trust:
+1. En Google Cloud Console cree credenciales **OAuth client ID** (tipo *Web
+   application*) con **Authorized redirect URI**:
+   `https://<hostname-del-worker>/api/auth/callback`.
+2. Configure las variables del Worker:
+   - `GOOGLE_CLIENT_ID` → var en `wrangler.jsonc` (no es secreto).
+   - `GOOGLE_CLIENT_SECRET` y `JWT_SECRET` → **secrets**:
+     ```bash
+     npx wrangler secret put GOOGLE_CLIENT_SECRET
+     npx wrangler secret put JWT_SECRET   # generar con: openssl rand -base64 32
+     ```
+3. Despliegue (`npx wrangler deploy` o push a `main`).
 
-1. Cree una aplicación de tipo *Self-hosted* apuntando al dominio del Worker.
-2. Defina la política de acceso (por ejemplo, correos del equipo autorizado).
-3. Tome el **Application Audience (AUD) Tag** y el **team domain**
-   (`https://<equipo>.cloudflareaccess.com`) y configúrelos como variables del
-   Worker:
-
-```bash
-npx wrangler deploy   # publica con las vars de wrangler.jsonc
-# o defínalas en el panel de Cloudflare: ACCESS_TEAM_DOMAIN, ACCESS_AUD, ADMIN_EMAIL
-```
-
-Con `ENTORNO=prod` y Access sin configurar, la API responde `401` (sin bypass).
+Con `ENTORNO=prod` y sin sesión válida, la API responde `401` y el frontend
+muestra la pantalla de login. En desarrollo (`ENTORNO=dev`) se usa el bypass
+local (no requiere Google).
 
 ---
 

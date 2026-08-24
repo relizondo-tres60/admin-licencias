@@ -13,7 +13,7 @@ import type { MiddlewareHandler } from 'hono'
 import type { Env, Actor, Rol, Variables } from '../tipos'
 import { ahora, primera } from './db'
 import { stmtHistorial } from './historial'
-import { verificarAccess } from './access'
+import { verificarSesion, leerCookie } from './session'
 
 type Ctx = { Bindings: Env; Variables: Variables }
 
@@ -47,10 +47,11 @@ async function obtenerEmail(env: Env, headers: Headers): Promise<string | null> 
     const [primero] = correosAdmin(env)
     return primero ?? null
   }
-  const token = headers.get('cf-access-jwt-assertion')
+  // Producción: sesión propia (cookie firmada tras el login con Google).
+  const token = leerCookie(headers, 'sesion')
   if (!token) return null
-  const email = await verificarAccess(env, token)
-  return email ? email.trim().toLowerCase() : null
+  const s = await verificarSesion(env, token)
+  return s?.email ? s.email.trim().toLowerCase() : null
 }
 
 /**
@@ -58,7 +59,7 @@ async function obtenerEmail(env: Env, headers: Headers): Promise<string | null> 
  * Crea/promueve el ADMIN_EMAIL como 'admin'. Registra LOGIN en la bitácora
  * la primera vez y cuando cambia el día de acceso.
  */
-async function resolverActor(env: Env, email: string, ip: string): Promise<Actor | null> {
+export async function resolverActor(env: Env, email: string, ip: string): Promise<Actor | null> {
   const admins = correosAdmin(env)
   let fila = await primera<FilaUsuario>(
     env,

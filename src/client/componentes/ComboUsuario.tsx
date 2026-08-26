@@ -10,6 +10,7 @@ export interface UsuarioMaestro {
   nombre: string
   email: string | null
   area: string | null
+  desvinculado?: number
 }
 
 export function ComboUsuario({
@@ -99,6 +100,11 @@ export function ComboUsuario({
                   className="block w-full px-3 py-2 text-left text-sm hover:bg-marca-50"
                 >
                   <span className="font-medium text-slate-700">{u.nombre}</span>
+                  {!!u.desvinculado && (
+                    <span className="ml-2 rounded bg-red-100 px-1.5 py-0.5 text-xs font-medium text-red-700">
+                      desvinculado
+                    </span>
+                  )}
                   <span className="ml-2 text-xs text-slate-400">
                     {u.email ?? '—'} · {u.area ?? '—'}
                   </span>

@@ -110,14 +110,27 @@ asignaciones.post('/', requireRol('admin', 'operador'), async (c) => {
   }
 
   // Regla 7: usuario del maestro debe existir y estar activo.
-  const usuario = await primera<{ id: number; nombre: string; activo: number }>(
+  const usuario = await primera<{ id: number; nombre: string; identificador: string; activo: number }>(
     c.env,
-    `SELECT id, nombre, activo FROM usuarios_maestro WHERE id = ?`,
+    `SELECT id, nombre, identificador, activo FROM usuarios_maestro WHERE id = ?`,
     d.usuario_maestro_id,
   )
   if (!usuario) return c.json({ error: 'Usuario del maestro no encontrado' }, 404)
   if (usuario.activo !== 1) {
     return c.json({ error: 'El usuario del maestro está inactivo y no puede recibir licencias' }, 409)
+  }
+
+  // No asignar a usuarios desvinculados (baja en AD).
+  const desv = await primera<{ x: number }>(
+    c.env,
+    `SELECT 1 AS x FROM usuarios_desvinculados WHERE identificador = ?`,
+    usuario.identificador,
+  )
+  if (desv) {
+    return c.json(
+      { error: 'El usuario está desvinculado (baja en AD) y no puede recibir nuevas licencias.' },
+      409,
+    )
   }
 
   // Regla 2: no asignar sin disponibilidad.

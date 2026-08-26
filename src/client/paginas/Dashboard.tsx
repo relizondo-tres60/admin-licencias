@@ -41,6 +41,10 @@ interface DashboardData {
       sin_aprobador: number
     }[]
   }
+  desvinculados: {
+    total: number
+    lista: { id: number; nombre: string; identificador: string; licencias: number }[]
+  }
   movimientos: {
     id: number
     ts: string
@@ -89,7 +93,7 @@ export default function Dashboard() {
   if (error) return <ErrorMsg error={error} />
   if (!data) return null
 
-  const { kpis, utilizacionPorApp, porTipo, alertas, movimientos } = data
+  const { kpis, utilizacionPorApp, porTipo, alertas, desvinculados, movimientos } = data
   const datosTipo = porTipo.map((t) => ({
     nombre: ETIQUETA_TIPO[t.tipo],
     tipo: t.tipo,
@@ -128,6 +132,41 @@ export default function Dashboard() {
         />
         <Kpi etiqueta="% de utilización" valor={porcentaje(kpis.utilizacion)} />
       </div>
+
+      {/* Desvinculados con licencias vigentes */}
+      {desvinculados.total > 0 && (
+        <div className="mt-5 rounded-lg border border-red-200 bg-red-50 p-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="text-sm font-semibold text-red-800">
+                Usuarios desvinculados con licencias vigentes
+              </div>
+              <div className="text-xs text-red-700/80">
+                Ex-colaboradores (baja en AD) que aún tienen licencias asignadas.
+              </div>
+            </div>
+            <div className="text-3xl font-bold text-red-700">{desvinculados.total}</div>
+          </div>
+          <ul className="mt-3 divide-y divide-red-100 border-t border-red-100 text-sm">
+            {desvinculados.lista.slice(0, 8).map((d) => (
+              <li key={d.id} className="flex items-center justify-between py-1.5">
+                <Link
+                  to={`/consulta?u=${d.id}`}
+                  className="font-medium text-red-800 hover:underline"
+                >
+                  {d.nombre}
+                </Link>
+                <span className="text-xs text-red-700">{d.licencias} licencia(s)</span>
+              </li>
+            ))}
+          </ul>
+          {desvinculados.lista.length > 8 && (
+            <div className="mt-2 text-xs text-red-700/80">
+              y {desvinculados.lista.length - 8} más…
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Gráficos */}
       <div className="mt-5 grid grid-cols-1 gap-5 lg:grid-cols-3">

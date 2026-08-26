@@ -15,7 +15,14 @@ interface UsuarioMaestro {
   area: string | null
   cargo: string | null
   activo: number
+  desvinculado: number
   sincronizado_en: string
+}
+
+interface ResumenDesv {
+  cargados: number
+  ignoradas: number
+  conLicencias: number
 }
 
 interface ResumenSync {
@@ -41,6 +48,7 @@ export default function Maestro() {
   const [q, setQ] = useState('')
   const [soloActivos, setSoloActivos] = useState(true)
   const inputArchivo = useRef<HTMLInputElement>(null)
+  const inputDesv = useRef<HTMLInputElement>(null)
 
   const { data, isLoading, error } = useQuery({
     queryKey: ['maestro', q, soloActivos],
@@ -73,6 +81,25 @@ export default function Maestro() {
     onSuccess: ({ resumen }) => {
       toast.exito(`Sincronizado desde archivo: ${textoResumen(resumen)}`)
       invalidar()
+    },
+    onError: (e: Error) => toast.error(e.message),
+  })
+
+  const subirDesvinculados = useMutation({
+    mutationFn: (file: File) => {
+      const form = new FormData()
+      form.append('archivo', file)
+      return apiSubir<{ resumen: ResumenDesv }>('/maestro/desvinculados', form)
+    },
+    onSuccess: ({ resumen }) => {
+      toast.exito(
+        `Desvinculados cargados: ${resumen.cargados}` +
+          (resumen.ignoradas ? ` · ${resumen.ignoradas} ignoradas` : '') +
+          ` · ${resumen.conLicencias} con licencias vigentes`,
+      )
+      qc.invalidateQueries({ queryKey: ['maestro'] })
+      qc.invalidateQueries({ queryKey: ['dashboard'] })
+      qc.invalidateQueries({ queryKey: ['historial'] })
     },
     onError: (e: Error) => toast.error(e.message),
   })
@@ -116,6 +143,37 @@ export default function Maestro() {
             </p>
           </div>
         </Tarjeta>
+      )}
+
+      {permisos.sincronizar && (
+        <div className="mt-5">
+          <Tarjeta titulo="Usuarios desvinculados (baja en AD)">
+            <div className="flex flex-wrap items-center gap-3">
+              <Boton
+                variante="secundario"
+                onClick={() => inputDesv.current?.click()}
+                disabled={subirDesvinculados.isPending}
+              >
+                {subirDesvinculados.isPending ? 'Procesando…' : 'Cargar desvinculados (.xlsx)'}
+              </Boton>
+              <input
+                ref={inputDesv}
+                type="file"
+                accept=".xlsx"
+                className="hidden"
+                onChange={(e) => {
+                  const f = e.target.files?.[0]
+                  if (f) subirDesvinculados.mutate(f)
+                  e.target.value = ''
+                }}
+              />
+              <p className="text-xs text-slate-500">
+                Planilla con los usuarios dados de baja (columna EMAIL o RUT). Se acumulan;
+                el inicio muestra cuántos aún tienen licencias vigentes.
+              </p>
+            </div>
+          </Tarjeta>
+        </div>
       )}
 
       <div className="mt-5">
@@ -168,11 +226,14 @@ export default function Maestro() {
                       <td className="py-2 pr-4 text-slate-600">{u.area ?? '—'}</td>
                       <td className="py-2 pr-4 text-slate-600">{u.cargo ?? '—'}</td>
                       <td className="py-2 pr-4">
-                        {u.activo ? (
-                          <Insignia tono="verde">Activo</Insignia>
-                        ) : (
-                          <Insignia tono="rojo">Inactivo</Insignia>
-                        )}
+                        <div className="flex items-center gap-1">
+                          {u.activo ? (
+                            <Insignia tono="verde">Activo</Insignia>
+                          ) : (
+                            <Insignia tono="rojo">Inactivo</Insignia>
+                          )}
+                          {!!u.desvinculado && <Insignia tono="rojo">Desvinculado</Insignia>}
+                        </div>
                       </td>
                       <td className="py-2 pr-4 text-xs text-slate-500">
                         {fechaHora(u.sincronizado_en)}

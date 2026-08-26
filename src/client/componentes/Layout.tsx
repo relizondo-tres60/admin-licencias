@@ -12,6 +12,7 @@ const NAV: ItemNav[] = [
   { a: '/licencias', etiqueta: 'Licencias' },
   { a: '/asignar', etiqueta: 'Asignar' },
   { a: '/asignaciones', etiqueta: 'Asignaciones vigentes' },
+  { a: '/consulta', etiqueta: 'Consulta de usuario' },
   { a: '/historial', etiqueta: 'Histórico' },
   { a: '/reportes', etiqueta: 'Reportes' },
   { a: '/maestro', etiqueta: 'Maestro de usuarios' },

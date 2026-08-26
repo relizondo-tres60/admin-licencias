@@ -28,12 +28,17 @@ function errorZod(e: import('zod').ZodError): string {
 // ── Listado (para la pestaña de asignaciones de una licencia y reportes) ─────
 asignaciones.get('/', async (c) => {
   const licenciaId = Number(c.req.query('licencia_id'))
+  const usuarioMaestroId = Number(c.req.query('usuario_maestro_id'))
   const estado = c.req.query('estado')
   const cond: string[] = []
   const params: unknown[] = []
   if (Number.isInteger(licenciaId)) {
     cond.push('a.licencia_id = ?')
     params.push(licenciaId)
+  }
+  if (Number.isInteger(usuarioMaestroId)) {
+    cond.push('a.usuario_maestro_id = ?')
+    params.push(usuarioMaestroId)
   }
   if (estado === 'asignada' || estado === 'liberada') {
     cond.push('a.estado = ?')

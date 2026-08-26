@@ -145,6 +145,28 @@ dashboard.get('/', async (c) => {
     ...paramsMov,
   )
 
+  // Usuarios desvinculados (baja en AD) que aún tienen licencias vigentes.
+  const condDesv = idsRestringidos
+    ? idsRestringidos.length === 0
+      ? ' AND 1 = 0'
+      : ` AND a.licencia_id IN (${idsRestringidos.map(() => '?').join(',')})`
+    : ''
+  const desvinculados = await consultar<{
+    id: number
+    nombre: string
+    identificador: string
+    licencias: number
+  }>(
+    c.env,
+    `SELECT m.id, m.nombre, m.identificador, COUNT(a.id) AS licencias
+     FROM usuarios_maestro m
+     JOIN usuarios_desvinculados d ON d.identificador = m.identificador
+     JOIN asignaciones a ON a.usuario_maestro_id = m.id AND a.estado = 'asignada'${condDesv}
+     GROUP BY m.id
+     ORDER BY m.nombre COLLATE NOCASE`,
+    ...(idsRestringidos ?? []),
+  )
+
   return c.json({
     kpis: { total, asignadas, disponibles, utilizacion },
     utilizacionPorApp,
@@ -154,6 +176,7 @@ dashboard.get('/', async (c) => {
       porVencer,
       sinResponsable,
     },
+    desvinculados: { total: desvinculados.length, lista: desvinculados },
     movimientos,
   })
 })
